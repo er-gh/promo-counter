@@ -3,6 +3,7 @@ from tkinter import ttk
 from math import log
 from tkinter.messagebox import showinfo, showerror
 import json
+from datetime import *
 
 
 def load_json():
@@ -19,7 +20,7 @@ json_file = {}
 try:
     json_file = load_json()
 except FileNotFoundError:
-    json_file = {'staff_codes': [], 'card_used': {'card_code': ''}}
+    json_file = {'staff_codes': []}
 
 
 def main_window():
@@ -28,8 +29,8 @@ def main_window():
     window_width = 1
     window_height = 1
     font_size = 1
-    root.geometry(f'300x200+{int(root.winfo_screenwidth() / 2) - int(300 / 2)}+{int(root.winfo_screenheight() / 2) - int(300 / 2)}')
-    root.minsize(310, 200)
+    root.geometry(f'420x260+{int(root.winfo_screenwidth() / 2) - int(300 / 2)}+{int(root.winfo_screenheight() / 2) - int(300 / 2)}')
+    root.minsize(300, 240)
 
     def config(event):
         nonlocal window_height
@@ -39,8 +40,7 @@ def main_window():
             window_width = root.winfo_width()
             window_height = root.winfo_height()
             font_size = int((window_width + window_height) / log(window_width + window_height, 1.1) + 5)
-            staff_label['font'] = staff_combo['font'] = card_label['font'] = card_entry['font'] = ('', font_size)
-            print(window_width, window_height)
+            staff_label['font'] = staff_combo['font'] = card_label['font'] = card_entry['font'] = amount_label['font'] = staff_code_label['font'] = ('', font_size)
 
     def create_frame(master, label_text):
         frame = ttk.Frame(master, borderwidth=1, relief=SOLID, padding=[5, 5])
@@ -64,8 +64,47 @@ def main_window():
         entry.pack(anchor=NW, fill=X)
         return frame, entry, label
 
-    def save_text(entry, combo):
-        print(entry.get(), combo.get())
+    def make_report(staff_code, card_code, card_uses):
+        with open('Отчет.txt', 'a+', encoding='utf-8') as fp:
+            fp.writelines(f'Дата: {datetime.strptime(str(datetime.now()), "%Y-%m-%d %H:%M:%S.%f")} | Продавец: {staff_code:6s} | Карта клиента: {card_code:12d} | Количество использований: {card_uses:6d}\n')
+
+    def save_text(entry, combo, label_user, label_staff):
+        card_code = entry.get()
+        staff_code = combo.get()
+        if card_code.strip() != '':
+            try:
+                card_code = int(card_code.replace(' ', ''))
+                if staff_code == '':
+                    showerror('Ошибка', 'Не выбран продавец')
+                else:
+                    try:
+                        json_file[f'card_{card_code}'] = {
+                            'uses': json_file[f'card_{card_code}']['uses'] + 1
+                        }
+                        label_user['text'] = f'Карта №{card_code} использовалась {json_file[f"card_{card_code}"]["uses"]} раз'
+                    except KeyError:
+                        label_user['text'] = f'Карта №{card_code} использовалась 1 раз'
+                        json_file[f'card_{card_code}'] = {
+                            'uses': 1
+                        }
+                    try:
+                        json_file[f'staff_{staff_code}'] = {
+                            'uses': json_file[f'staff_{staff_code}']['uses'] + 1
+                        }
+                        label_staff['text'] = f'Сотрудник №{staff_code} записал {json_file[f"staff_{staff_code}"]["uses"]} карт'
+                    except KeyError:
+                        label_staff['text'] = f'Сотрудник №{staff_code} записал 1 карт'
+                        json_file[f'staff_{staff_code}'] = {
+                            'uses': 1
+                        }
+                    make_report(staff_code, card_code, json_file[f'card_{card_code}']['uses'])
+            except ValueError:
+                showerror('Ошибка', f'Номер карты должен состоять только из цифр - "{card_code}"')
+
+
+    def destroy_window(win):
+        save_json(json_file)
+        win.destroy()
 
     # Dialog window ----------------------------------------
     def add_to_items_list_window(master, combo, items_list, mode):
@@ -104,6 +143,7 @@ def main_window():
                         entry.delete(0, END)
                     else:
                         showinfo('Информация', f'Пользователь "{value}" уже записан')
+                json_file['staff_codes'] = items_list
 
         window.protocol('WM_DELETE_WINDOW', lambda: win_destroy(window))
 
@@ -126,18 +166,24 @@ def main_window():
     card_frame, card_entry, card_label = create_entry_frame(root, 'Номер карты')
     card_frame.pack(fill=X, pady=5, padx=5)
 
-    staff_list = [1, 2, 3, 4]
+    staff_list = json_file['staff_codes']
 
     staff_frame, staff_combo, staff_label, staff_btn_add, staff_btn_remove = create_combo_frame(root, 'Код сотрудника', staff_list)
     staff_btn_add['command'] = lambda: add_to_items_list_window(root, staff_combo, staff_list, 'add')
     staff_btn_remove['command'] = lambda: add_to_items_list_window(root, staff_combo, staff_list, 'remove')
     staff_frame.pack(fill=X, padx=5, pady=5)
 
-    btn_ok = ttk.Button(command=lambda: save_text(card_entry, staff_combo))
+    btn_ok = ttk.Button(command=lambda: save_text(card_entry, staff_combo, amount_label, staff_code_label))
     btn_ok['text'] = 'OK'
     btn_ok.pack(side='bottom', pady=10)
 
+    amount_label = ttk.Label(root, font=('', 13))
+    amount_label.pack()
+    staff_code_label = ttk.Label(root, font=('', 13))
+    staff_code_label.pack()
+
     root.bind("<Configure>", config)
+    root.protocol('WM_DELETE_WINDOW', lambda: destroy_window(root))
     root.mainloop()
 
 
