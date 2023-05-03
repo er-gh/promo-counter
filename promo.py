@@ -4,6 +4,7 @@ from math import log
 from tkinter.messagebox import showinfo, showerror
 import json
 from datetime import *
+import ctypes
 
 
 def load_json():
@@ -163,6 +164,21 @@ def main_window():
         window.grab_set()
         window.wait_window()
 
+    def keys(event):
+        u = ctypes.windll.LoadLibrary("user32.dll")
+        pf = getattr(u, "GetKeyboardLayout")
+        if hex(pf(0)) == '0x4190419':  # ru - 0x4190419, en - 0x4090409
+            if event.keycode == 86:  # 86 - V
+                if card_entry.select_present():
+                    card_entry.delete(card_entry.index("sel.first"), card_entry.index("sel.last"))
+                card_entry.insert(card_entry.index("insert"), root.clipboard_get())
+                card_entry.select_range(0, 0)
+            if event.keycode == 67 and card_entry.select_present():  # 67 - C
+                root.clipboard_clear()
+                root.clipboard_append(card_entry.get()[card_entry.index("sel.first"):card_entry.index("sel.last")])
+            if event.keycode == 65:  # 65 - A
+                card_entry.select_range(0, "end")
+
     card_frame, card_entry, card_label = create_entry_frame(root, 'Номер карты')
     card_frame.pack(fill=X, pady=5, padx=5)
 
@@ -183,6 +199,7 @@ def main_window():
     staff_code_label.pack()
 
     root.bind("<Configure>", config)
+    root.bind("<Control-KeyPress>", keys)
     root.protocol('WM_DELETE_WINDOW', lambda: destroy_window(root))
     root.mainloop()
 
